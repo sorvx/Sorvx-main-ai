@@ -27,7 +27,7 @@ export const Overview = () => {
 
         <div className="space-y-4 text-sm text-zinc-600 dark:text-zinc-400">
           <p className="leading-relaxed">
-            This is a Chatbot Named Sorvx AI powered by the Sorvx-s2-70B 
+            This is a Chatbot Named Sorvx AI powered by the Sorvx-S2-70B 
             model built by Sorvx Labs. It uses the{" "}
             <code className="rounded-sm bg-muted-foreground/15 px-1.5 py-0.5">
               streamText
