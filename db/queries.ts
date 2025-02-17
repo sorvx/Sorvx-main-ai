@@ -73,18 +73,14 @@ async function verifyConnection() {
   }
 }
 
-// Create the main client for Drizzle
+// Configure the PostgreSQL client with SSL
 const client = postgres(process.env.POSTGRES_URL!, {
-  ssl: {
-    ca,
-    rejectUnauthorized: true
-  },
-  max: 1,
-  idle_timeout: 20,
-  connect_timeout: 10,
-  connection: {
-    application_name: 'sorvx-ai'
-  }
+  ssl: process.env.NODE_ENV === 'production' ? 
+    { rejectUnauthorized: true } : 
+    { 
+      rejectUnauthorized: true,
+      ca: process.env.CA_CERT 
+    }
 });
 
 export const db = drizzle(client);

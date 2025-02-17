@@ -1,12 +1,9 @@
 import { config } from "dotenv";
 import { defineConfig } from "drizzle-kit";
-import * as fs from 'fs';
 
 config({
   path: ".env.local",
 });
-
-const ca = fs.readFileSync('ca.crt').toString();
 
 // Parse connection string
 const parseConnectionString = (url: string) => {
@@ -36,9 +33,6 @@ export default defineConfig({
   dialect: "postgresql",
   dbCredentials: {
     ...dbConfig,
-    ssl: {
-      ca,
-      rejectUnauthorized: true
-    }
+    ssl: true
   }
 });
