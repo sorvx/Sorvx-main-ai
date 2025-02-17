@@ -4,21 +4,112 @@ import { genSaltSync, hashSync } from "bcrypt-ts";
 import { desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
+import * as fs from 'fs';
+import { writeFileSync, existsSync } from 'fs';
 
 import { user, chat, User, reservation } from "./schema";
 
-// Optionally, if not using email/pass login, you can
-// use the Drizzle adapter for Auth.js / NextAuth
-// https://authjs.dev/reference/adapter/drizzle
-let client = postgres(`${process.env.POSTGRES_URL!}?sslmode=require`);
-let db = drizzle(client);
+// Add this near the top of the file
+const CA_CERT = `-----BEGIN CERTIFICATE-----
+MIIETTCCArWgAwIBAgIUMVFwAcPyApGsBLG6qiEEuo9xfS8wDQYJKoZIhvcNAQEM
+BQAwQDE+MDwGA1UEAww1YjljYTBiMTItN2Y2My00YWQ3LTg0YTMtMjliZDkwNDhm
+OWI0IEdFTiAxIFByb2plY3QgQ0EwHhcNMjUwMjEzMDUyMzQyWhcNMzUwMjExMDUy
+MzQyWjBAMT4wPAYDVQQDDDViOWNhMGIxMi03ZjYzLTRhZDctODRhMy0yOWJkOTA0
+OGY5YjQgR0VOIDEgUHJvamVjdCBDQTCCAaIwDQYJKoZIhvcNAQEBBQADggGPADCC
+AYoCggGBAPSbG8uy/BfmoEGs2i4NydoWj/aQIe8qEi9ZzBppvNCHWv/jid7Xb6D3
+4kkxKchQAU2/50E5VJ5UwtFHjUSOtDUOzhJkaiHlCNkzVkaDmkvpbA5IIVB1hmmK
+6ew+WDnm4BDu+WeqoWpC932QmWs+uqR0WzNacJ1du4IIUfFiVhclpAiJeKiwMv0I
+KXbe3uw+EOtXnjViZyxg0F0gF5lkMSmFz3/BVCrUzgv0yJ4kpk8gOIP9X3LCrzwA
+MIZd55JxMq+nX2cWnj1C5H3fSh8V12GkGkmrX+4kCblNMCufdGE9cgfq9wXApcd/
+ERNkSCAa/gzP1OO4xKSuxKy3esS/JQxCZFc8J3ANJKwomR11pARoxHXIQLaY8YH5
+a3+OcN94HFzhmEm9oItnYyqK1vv/S6Rpr7EuSGvbbAIqwnEYBmgFl0N4WbsNFkSB
+cJ2Y3wSPIzK9262/UjM6eIvhMCWz5T81yhLQibBV6BNG9pphuq5whr2cUtCDshft
+FbSKDbnIFQIDAQABoz8wPTAdBgNVHQ4EFgQUS3WgE5tkK7KnmFE66KzeqoV6gaAw
+DwYDVR0TBAgwBgEB/wIBADALBgNVHQ8EBAMCAQYwDQYJKoZIhvcNAQEMBQADggGB
+ANCXeqSPd33rpgMtYD8NoMpx1FSAse7UILYAO2nNZ8RHhEzVKjP2unZ8kW53ShwC
+ydJiv+zPI+zLRGiX2fzQXG/mByqLslx+XtO0zeTDIoRId+YnfNJPasKuU7xQbafR
+CHfsVOWq+yY/tpTMrAfPQv3eh7635vpD6WJwGYKYu2ElIw5LBcPenk1vagHaxTZf
+3TxusBb7uutN+kiZGxOjmUqdRMQ8STJOV/Q1kx/IOIzWN/k8m9juI+ASKUnKZ8SR
+mWIWCM09JEY+YxhEzHGAZXG41Me1XKJAy0L9IqI9KiQjK3uzahEtHi7ZQUmN9qGn
+hAKfFeBICMho5jgSRcQgzZvHgOe/ybF5bLQz47WxbZe1JDiqgXOuZQ5uw3cHxeNj
+y5j+Zh5rqXUL6GgEkQMhM7ICh1iVXSHZzEK552DupZ0jPPh+L68UqHhiqdqeCBE6
+9KgV1smuotoqY6NP2a13ZWX7z0pI0wZaulo6HUSZG6vF4Pjf3iC586BnjGl5DRye
+rA==
+-----END CERTIFICATE-----`;
+
+// Create ca.crt if it doesn't exist
+if (!existsSync('ca.crt')) {
+  try {
+    writeFileSync('ca.crt', CA_CERT);
+    console.log('✅ Created ca.crt file');
+  } catch (error) {
+    console.error('❌ Failed to create ca.crt:', error);
+    process.exit(1);
+  }
+}
+
+// Read the CA certificate
+const ca = fs.readFileSync('ca.crt').toString();
+
+// Modify the verifyConnection function to use sql template literal
+async function verifyConnection() {
+  try {
+    const sql = postgres(process.env.POSTGRES_URL!, {
+      ssl: {
+        ca,
+        rejectUnauthorized: true
+      },
+      max: 1,
+      idle_timeout: 20,
+      connect_timeout: 10
+    });
+    
+    await sql`SELECT 1`;
+    console.log('✅ Database connection verified');
+    await sql.end();
+  } catch (error) {
+    console.error('❌ Database connection failed:', error);
+    throw error;
+  }
+}
+
+// Create the main client for Drizzle
+const client = postgres(process.env.POSTGRES_URL!, {
+  ssl: {
+    ca,
+    rejectUnauthorized: true
+  },
+  max: 1,
+  idle_timeout: 20,
+  connect_timeout: 10,
+  connection: {
+    application_name: 'sorvx-ai'
+  }
+});
+
+export const db = drizzle(client);
+
+// Only verify connection in development
+if (process.env.NODE_ENV === 'development') {
+  verifyConnection().catch(console.error);
+}
+
+// Add error logging utility
+const logError = (operation: string, error: any) => {
+  console.error(`Database ${operation} failed:`, {
+    message: error.message,
+    code: error.code,
+    detail: error.detail
+  });
+};
 
 export async function getUser(email: string): Promise<Array<User>> {
   try {
     return await db.select().from(user).where(eq(user.email, email));
   } catch (error) {
-    console.error("Failed to get user from database");
-    throw error;
+    logError('getUser', error);
+    // Rethrow with more context
+    throw new Error(`Failed to get user: ${error.message}`);
   }
 }
 
@@ -27,10 +118,15 @@ export async function createUser(email: string, password: string) {
   let hash = hashSync(password, salt);
 
   try {
-    return await db.insert(user).values({ email, password: hash });
-  } catch (error) {
-    console.error("Failed to create user in database");
-    throw error;
+    const result = await db.insert(user).values({ email, password: hash });
+    return result;
+  } catch (error: any) {
+    logError('createUser', error);
+    // Handle unique constraint violation
+    if (error.code === '23505') { // PostgreSQL unique violation code
+      throw new Error('User already exists');
+    }
+    throw new Error(`Failed to create user: ${error.message}`);
   }
 }
 
