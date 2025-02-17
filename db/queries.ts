@@ -76,8 +76,7 @@ async function verifyConnection() {
 // Configure the PostgreSQL client with SSL
 const client = postgres(process.env.POSTGRES_URL!, {
   ssl: {
-    rejectUnauthorized: true,
-    ca: process.env.CA_CERT
+    rejectUnauthorized: false // Allow self-signed certificates
   },
   max: 1,
   idle_timeout: 20,

@@ -14,8 +14,7 @@ const runMigrate = async () => {
 
   const connection = postgres(process.env.POSTGRES_URL, { 
     ssl: {
-      rejectUnauthorized: true,
-      ca: process.env.CA_CERT
+      rejectUnauthorized: false // Allow self-signed certificates
     },
     max: 1,
     idle_timeout: 20,
