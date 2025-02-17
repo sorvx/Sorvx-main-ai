@@ -94,22 +94,33 @@ if (process.env.NODE_ENV === 'development') {
   verifyConnection().catch(console.error);
 }
 
-// Add error logging utility
-const logError = (operation: string, error: any) => {
+// Add error type utility
+type DatabaseError = {
+  message: string;
+  code?: string;
+  detail?: string;
+};
+
+// Update error logging utility
+const logError = (operation: string, error: unknown) => {
+  const dbError = error as DatabaseError;
   console.error(`Database ${operation} failed:`, {
-    message: error.message,
-    code: error.code,
-    detail: error.detail
+    message: dbError.message,
+    code: dbError.code,
+    detail: dbError.detail
   });
 };
 
 export async function getUser(email: string): Promise<Array<User>> {
   try {
     return await db.select().from(user).where(eq(user.email, email));
-  } catch (error) {
+  } catch (error: unknown) {
     logError('getUser', error);
     // Rethrow with more context
-    throw new Error(`Failed to get user: ${error.message}`);
+    if (error instanceof Error) {
+      throw new Error(`Failed to get user: ${error.message}`);
+    }
+    throw new Error('Failed to get user: Unknown error');
   }
 }
 
@@ -120,13 +131,14 @@ export async function createUser(email: string, password: string) {
   try {
     const result = await db.insert(user).values({ email, password: hash });
     return result;
-  } catch (error: any) {
+  } catch (error: unknown) {
     logError('createUser', error);
+    const dbError = error as DatabaseError;
     // Handle unique constraint violation
-    if (error.code === '23505') { // PostgreSQL unique violation code
+    if (dbError.code === '23505') {
       throw new Error('User already exists');
     }
-    throw new Error(`Failed to create user: ${error.message}`);
+    throw new Error(`Failed to create user: ${dbError.message || 'Unknown error'}`);
   }
 }
 
@@ -157,9 +169,12 @@ export async function saveChat({
       messages: JSON.stringify(messages),
       userId,
     });
-  } catch (error) {
-    console.error("Failed to save chat in database");
-    throw error;
+  } catch (error: unknown) {
+    logError('saveChat', error);
+    if (error instanceof Error) {
+      throw new Error(`Failed to save chat: ${error.message}`);
+    }
+    throw new Error('Failed to save chat: Unknown error');
   }
 }
 
