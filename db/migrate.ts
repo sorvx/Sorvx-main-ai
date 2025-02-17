@@ -13,7 +13,10 @@ const runMigrate = async () => {
   }
 
   const connection = postgres(process.env.POSTGRES_URL, { 
-    ssl: 'require',
+    ssl: {
+      rejectUnauthorized: true,
+      ca: process.env.CA_CERT
+    },
     max: 1,
     idle_timeout: 20,
     connect_timeout: 10
