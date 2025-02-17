@@ -17,18 +17,24 @@ const FileSchema = z.object({
 });
 
 export async function POST(request: Request) {
-  const session = await auth();
-
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   try {
+    const session = await auth();
+
+    if (!session) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
     const formData = await request.formData();
     const file = formData.get("file");
 
     if (!file) {
-      return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
+      return new Response(JSON.stringify({ error: "No file uploaded" }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
 
     // Validate file without using File type
@@ -42,28 +48,33 @@ export async function POST(request: Request) {
         .map((error) => error.message)
         .join(", ");
 
-      return NextResponse.json({ error: errorMessage }, { status: 400 });
-    }
-
-    try {
-      // Convert file to buffer
-      const buffer = await (file as any).arrayBuffer();
-      const filename = (file as any).name;
-
-      const data = await put(filename, buffer, {
-        access: "public",
+      return new Response(JSON.stringify({ error: errorMessage }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
       });
-
-      return NextResponse.json(data);
-    } catch (error) {
-      console.error("Upload error:", error);
-      return NextResponse.json({ error: "Upload failed" }, { status: 500 });
     }
+
+    // Convert file to buffer
+    const buffer = await (file as any).arrayBuffer();
+    const filename = (file as any).name;
+
+    const data = await put(filename, buffer, {
+      access: "public",
+    });
+
+    return new Response(JSON.stringify(data), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
+
   } catch (error) {
     console.error("Request error:", error);
-    return NextResponse.json(
-      { error: "Failed to process request" },
-      { status: 500 },
-    );
+    return new Response(JSON.stringify({ 
+      error: "Failed to process request",
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 }
